@@ -8,6 +8,7 @@
 #include <random>
 #include <ctime>
 #include <cstdlib>
+#include <cmath>     // abs()
 
 #include "header.h"
 #include "miscellaneous.h"
@@ -52,6 +53,7 @@ namespace ndrnp {
         // search a minimum set cover of _set field using _family field,
         // using the greedy algorithm.
         std::set<key_type> minimum_set_cover() const;
+        std::set<key_type> weight_set_cover(const size_type&) const;
         std::set<key_type> rrnp_msc(const std::set<size_type>&) const;
         std::set<key_type> random_set_cover(std::default_random_engine&,
                                     const std::set<size_type>&) const;
@@ -65,6 +67,7 @@ namespace ndrnp {
     private:
         // return the key of the set with maximal size from given family.
         key_type max_set(std::map<key_type, std::set<value_type>>&) const;
+        key_type max_weight_set(std::map<key_type, std::set<value_type>>&, const size_type&) const;
         key_type random_set(std::default_random_engine&, 
                             std::map<key_type, std::set<value_type>>&) const;
 
@@ -158,6 +161,29 @@ namespace ndrnp {
     }
 
     template <typename T, typename K>
+    T
+    Cover<T,K>::max_weight_set(std::map<T, std::set<K>>& f, const size_type& size) const {
+        bool flag = false;
+        T m;
+
+        for (auto &s : f) {
+            if (!flag) {
+                flag = true;
+                m = s.first;
+                continue;
+            } else {
+                if (s.second.size() - size == 0) {
+                    m = s.first; break;
+                } else if (std::abs(s.second.size() - size) <
+                           std::abs(f[m].size() - size)) {
+                    m = s.first;
+                }
+            }
+        }
+        return m;
+    }
+
+    template <typename T, typename K>
     std::set<T>
     Cover<T,K>::minimum_set_cover() const {
         std::set<T>                mi;
@@ -184,6 +210,44 @@ namespace ndrnp {
             // if the whole family cannot guarantee a fully set cover,
             // return an empty set.
             if (tmp_f.empty() && !tmp_s.empty()) {
+                mi.clear();
+                return mi;
+            }
+        }
+        return mi;
+    }
+
+    template <typename T, typename K>
+    std::set<T>
+    Cover<T,K>::weight_set_cover(const size_type& size) const {
+        std::set<T>                  mi;
+        std::set<K>                  tmp;
+        std::set<K>                  tmp_s = _set;
+        std::map<T, std::set<K>>     tmp_f = _family;
+        T                            m;
+
+        std::cout << "-------------------" << std::endl;
+        for (auto &e : tmp_s)
+            std::cout << e << " ";
+        std::cout << std::endl;
+        std::cout << "-------------------" << std::endl;
+        while (!tmp_s.empty()) {
+            m = max_weight_set(tmp_f, size);
+            for (auto &e : tmp_f[m])
+                tmp.insert(e);
+            for (auto &e : tmp_f[m])
+                tmp_s.erase(e);
+            for (auto &f : tmp_f)
+                if (f.first != m)
+                    for (auto &e : tmp_f[m])
+                        f.second.erase(e);
+            if (tmp_f[m].size() != 0) {
+                mi.insert(m);
+            }
+            tmp_f.erase(m);
+            if (tmp_f.empty() && !tmp_s.empty()) {
+                for (auto &e : tmp)
+                    std::cout << e << " ";
                 mi.clear();
                 return mi;
             }
@@ -285,6 +349,7 @@ namespace ndrnp {
         }
         return mi;
     }
+
 
     template <typename T, typename K>
     T
